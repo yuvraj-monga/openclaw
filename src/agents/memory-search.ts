@@ -63,6 +63,24 @@ export type ResolvedMemorySearchConfig = {
       textWeight: number;
       candidateMultiplier: number;
     };
+    expansion?: {
+      enabled: boolean;
+      maxTerms?: number;
+    };
+    rerank?: {
+      enabled: boolean;
+      topK?: number;
+      minScore?: number;
+    };
+    multiHop?: {
+      enabled: boolean;
+      maxHops?: number;
+      minImprovement?: number;
+      resultsPerHop?: number;
+    };
+    contextAware?: {
+      enabled: boolean;
+    };
   };
   cache: {
     enabled: boolean;
@@ -230,6 +248,28 @@ function mergeConfig(
       defaults?.query?.hybrid?.candidateMultiplier ??
       DEFAULT_HYBRID_CANDIDATE_MULTIPLIER,
   };
+  const expansion = {
+    enabled:
+      overrides?.query?.expansion?.enabled ?? defaults?.query?.expansion?.enabled ?? false,
+    maxTerms: overrides?.query?.expansion?.maxTerms ?? defaults?.query?.expansion?.maxTerms ?? 3,
+  };
+  const rerank = {
+    enabled: overrides?.query?.rerank?.enabled ?? defaults?.query?.rerank?.enabled ?? false,
+    topK: overrides?.query?.rerank?.topK ?? defaults?.query?.rerank?.topK ?? 20,
+    minScore: overrides?.query?.rerank?.minScore ?? defaults?.query?.rerank?.minScore ?? 0.25,
+  };
+  const multiHop = {
+    enabled: overrides?.query?.multiHop?.enabled ?? defaults?.query?.multiHop?.enabled ?? false,
+    maxHops: overrides?.query?.multiHop?.maxHops ?? defaults?.query?.multiHop?.maxHops ?? 2,
+    minImprovement:
+      overrides?.query?.multiHop?.minImprovement ?? defaults?.query?.multiHop?.minImprovement ?? 0.05,
+    resultsPerHop:
+      overrides?.query?.multiHop?.resultsPerHop ?? defaults?.query?.multiHop?.resultsPerHop ?? 10,
+  };
+  const contextAware = {
+    enabled:
+      overrides?.query?.contextAware?.enabled ?? defaults?.query?.contextAware?.enabled ?? false,
+  };
   const cache = {
     enabled: overrides?.cache?.enabled ?? defaults?.cache?.enabled ?? DEFAULT_CACHE_ENABLED,
     maxEntries: overrides?.cache?.maxEntries ?? defaults?.cache?.maxEntries,
@@ -275,6 +315,32 @@ function mergeConfig(
         textWeight: normalizedTextWeight,
         candidateMultiplier,
       },
+      expansion: expansion.enabled
+        ? {
+            enabled: true,
+            maxTerms: Math.max(1, Math.min(10, expansion.maxTerms)),
+          }
+        : undefined,
+      rerank: rerank.enabled
+        ? {
+            enabled: true,
+            topK: Math.max(5, Math.min(100, rerank.topK)),
+            minScore: clampNumber(rerank.minScore, 0, 1),
+          }
+        : undefined,
+      multiHop: multiHop.enabled
+        ? {
+            enabled: true,
+            maxHops: Math.max(1, Math.min(5, multiHop.maxHops)),
+            minImprovement: clampNumber(multiHop.minImprovement, 0, 1),
+            resultsPerHop: Math.max(5, Math.min(50, multiHop.resultsPerHop)),
+          }
+        : undefined,
+      contextAware: contextAware.enabled
+        ? {
+            enabled: true,
+          }
+        : undefined,
     },
     cache: {
       enabled: Boolean(cache.enabled),

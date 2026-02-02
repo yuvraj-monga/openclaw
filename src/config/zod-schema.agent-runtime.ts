@@ -397,6 +397,36 @@ export const MemorySearchSchema = z
           })
           .strict()
           .optional(),
+        expansion: z
+          .object({
+            enabled: z.boolean().optional(),
+            maxTerms: z.number().int().positive().optional(),
+          })
+          .strict()
+          .optional(),
+        rerank: z
+          .object({
+            enabled: z.boolean().optional(),
+            topK: z.number().int().positive().optional(),
+            minScore: z.number().min(0).max(1).optional(),
+          })
+          .strict()
+          .optional(),
+        multiHop: z
+          .object({
+            enabled: z.boolean().optional(),
+            maxHops: z.number().int().positive().optional(),
+            minImprovement: z.number().min(0).max(1).optional(),
+            resultsPerHop: z.number().int().positive().optional(),
+          })
+          .strict()
+          .optional(),
+        contextAware: z
+          .object({
+            enabled: z.boolean().optional(),
+          })
+          .strict()
+          .optional(),
       })
       .strict()
       .optional(),

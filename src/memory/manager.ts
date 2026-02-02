@@ -273,6 +273,7 @@ export class MemoryIndexManager {
       maxResults?: number;
       minScore?: number;
       sessionKey?: string;
+      context?: import("./context-aware.js").ConversationContext;
     },
   ): Promise<MemorySearchResult[]> {
     void this.warmSession(opts?.sessionKey);
@@ -285,6 +286,31 @@ export class MemoryIndexManager {
     if (!cleaned) {
       return [];
     }
+
+    // Check if enhanced retrieval features are enabled
+    const useEnhanced =
+      this.settings.query.expansion?.enabled ||
+      this.settings.query.rerank?.enabled ||
+      this.settings.query.multiHop?.enabled ||
+      this.settings.query.contextAware?.enabled;
+
+    if (useEnhanced) {
+      // Use enhanced search wrapper
+      const { enhancedSearch } = await import("./enhanced-search.js");
+      return await enhancedSearch(this, cleaned, {
+        expansion: this.settings.query.expansion,
+        rerank: this.settings.query.rerank,
+        multiHop: this.settings.query.multiHop,
+        contextAware: this.settings.query.contextAware?.enabled
+          ? {
+              enabled: true,
+              context: opts?.context,
+            }
+          : undefined,
+      });
+    }
+
+    // Standard search (existing implementation)
     const minScore = opts?.minScore ?? this.settings.query.minScore;
     const maxResults = opts?.maxResults ?? this.settings.query.maxResults;
     const hybrid = this.settings.query.hybrid;
