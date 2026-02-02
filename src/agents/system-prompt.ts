@@ -551,6 +551,24 @@ export function buildAgentSystemPrompt(params: {
     }
   }
 
+  // Add soul-based personality guidance if soul evolution is enabled
+  // This is injected after SOUL.md to provide dynamic personality adjustments
+  try {
+    const { getSoulManager } = await import("./soul-manager.js");
+    const soulManager = getSoulManager(params.workspaceDir);
+    const soulAdditions = await soulManager.generateSystemPromptAdditions({
+      conversationHistory: undefined, // Could be passed in future
+      currentTask: undefined,
+    });
+    if (soulAdditions.length > 0) {
+      lines.push("");
+      lines.push(...soulAdditions);
+    }
+  } catch (err) {
+    // Soul manager not available or error - continue without it
+    // This is optional functionality
+  }
+
   // Skip silent replies for subagent/none modes
   if (!isMinimal) {
     lines.push(
