@@ -175,6 +175,10 @@ ENV NODE_ENV=production
 CMD ["node","dist/index.js"]
 ```
 
+### Coolify, Railway, or other Nixpacks-based deploys
+
+If you deploy with **Coolify**, **Railway**, or any platform that uses **Nixpacks** (instead of the repo Dockerfile), the build runs `pnpm run build` without `vendor/` or `apps/` in context, so the A2UI canvas bundle cannot be built. The repo includes a **`nixpacks.toml`** that sets `OPENCLAW_A2UI_SKIP_MISSING=1`, so the build skips the A2UI copy step and completes successfully. Canvas A2UI features will not be available in that image; the rest of the gateway works as usual. If you override the build (e.g. custom Nixpacks config), set `OPENCLAW_A2UI_SKIP_MISSING=1` for the build phase so the copy step does not fail.
+
 ### Channel setup (optional)
 
 Use the CLI container to configure channels, then restart the gateway if needed.

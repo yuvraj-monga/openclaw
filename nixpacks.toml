@@ -1,0 +1,4 @@
+# Nixpacks config for Coolify, Railway, and other Nixpacks-based deploys.
+# A2UI bundle requires vendor/ and apps/ (excluded in Docker context); skip copy when missing.
+[variables]
+OPENCLAW_A2UI_SKIP_MISSING = "1"
