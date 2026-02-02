@@ -42,12 +42,14 @@ Quick reference checklist for tracking implementation progress.
 
 ## Phase 2: Advanced Memory (Weeks 5-8)
 
-### Week 5: Proactive Memory Capture
-- [ ] `src/memory/capture-engine.ts` - Capture engine
-- [ ] `src/memory/importance-scorer.ts` - Importance scoring
-- [ ] `src/memory/capture-hooks.ts` - Event hooks
-- [ ] Integration with agent events
-- [ ] Tests for capture triggers
+### Week 5: Proactive Memory Capture ✅
+- [x] `src/memory/capture-engine.ts` - Capture engine
+- [x] `src/memory/importance-scorer.ts` - Importance scoring
+- [x] `src/memory/capture-hooks.ts` - Event hooks
+- [x] `src/hooks/bundled/memory-capture/` - Handler + HOOK.md (agent:end)
+- [x] Integration with agent events (trigger agent:end from attempt.ts)
+- [x] Wire importance scorer to memory search retrieval (recordRetrievalForResults)
+- [x] Tests for capture triggers (importance-scorer.test.ts, capture-engine.test.ts, memory-capture handler.test.ts)
 
 ### Week 6: Structured Fact Extraction
 - [ ] `src/memory/retain-parser.ts` - Retain section parser

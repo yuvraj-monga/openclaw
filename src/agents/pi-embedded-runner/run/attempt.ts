@@ -12,6 +12,7 @@ import os from "node:os";
 import type { EmbeddedRunAttemptParams, EmbeddedRunAttemptResult } from "./types.js";
 import { resolveHeartbeatPrompt } from "../../../auto-reply/heartbeat.js";
 import { resolveChannelCapabilities } from "../../../config/channel-capabilities.js";
+import { createInternalHookEvent, triggerInternalHook } from "../../../hooks/internal-hooks.js";
 import { getMachineDisplayName } from "../../../infra/machine-name.js";
 import { MAX_IMAGE_BYTES } from "../../../media/constants.js";
 import { getGlobalHookRunner } from "../../../plugins/hook-runner-global.js";
@@ -853,6 +854,21 @@ export async function runEmbeddedAttempt(
               log.warn(`agent_end hook failed: ${err}`);
             });
         }
+
+        // Trigger internal hook agent:end for proactive memory capture (fire-and-forget)
+        const agentEndEvent = createInternalHookEvent(
+          "agent",
+          "end",
+          params.sessionKey ?? params.sessionId,
+          {
+            workspaceDir: params.workspaceDir,
+            messages: messagesSnapshot,
+            success: !aborted && !promptError,
+            runId: params.runId,
+            sessionKey: params.sessionKey,
+          },
+        );
+        void triggerInternalHook(agentEndEvent);
       } finally {
         clearTimeout(abortTimer);
         if (abortWarnTimer) {

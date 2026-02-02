@@ -28,6 +28,7 @@ import {
   type OpenAiEmbeddingClient,
 } from "./embeddings.js";
 import { bm25RankToScore, buildFtsQuery, mergeHybridResults } from "./hybrid.js";
+import { recordRetrievalForResults } from "./importance-scorer.js";
 import {
   buildFileEntry,
   chunkMarkdown,
@@ -297,7 +298,7 @@ export class MemoryIndexManager {
     if (useEnhanced) {
       // Use enhanced search wrapper
       const { enhancedSearch } = await import("./enhanced-search.js");
-      return await enhancedSearch(this, cleaned, {
+      const results = await enhancedSearch(this, cleaned, {
         expansion: this.settings.query.expansion,
         rerank: this.settings.query.rerank,
         multiHop: this.settings.query.multiHop,
@@ -308,6 +309,8 @@ export class MemoryIndexManager {
             }
           : undefined,
       });
+      recordRetrievalForResults(this.workspaceDir, results);
+      return results;
     }
 
     // Standard search (existing implementation)
@@ -330,7 +333,9 @@ export class MemoryIndexManager {
       : [];
 
     if (!hybrid.enabled) {
-      return vectorResults.filter((entry) => entry.score >= minScore).slice(0, maxResults);
+      const out = vectorResults.filter((entry) => entry.score >= minScore).slice(0, maxResults);
+      recordRetrievalForResults(this.workspaceDir, out);
+      return out;
     }
 
     const merged = this.mergeHybridResults({
@@ -340,7 +345,9 @@ export class MemoryIndexManager {
       textWeight: hybrid.textWeight,
     });
 
-    return merged.filter((entry) => entry.score >= minScore).slice(0, maxResults);
+    const out = merged.filter((entry) => entry.score >= minScore).slice(0, maxResults);
+    recordRetrievalForResults(this.workspaceDir, out);
+    return out;
   }
 
   private async searchVector(

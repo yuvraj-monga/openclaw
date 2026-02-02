@@ -32,6 +32,20 @@ Logs all command events to a centralized audit file.
 openclaw hooks enable command-logger
 ```
 
+### 🧠 memory-capture
+
+Proactive memory capture when an agent run ends: extracts candidate facts (preferences, experiences) from the conversation and persists them to the entity/opinion bank.
+
+**Events**: `agent:end`
+**What it does**: Extracts preference-like and experience-like sentences (e.g. "I prefer X", "we fixed Y") and adds them to `bank/entities/*.md` and `bank/opinions.md`.
+**Output**: Facts added to entity pages and opinions file.
+
+**Enable**:
+
+```bash
+openclaw hooks enable memory-capture
+```
+
 ### 😈 soul-evil
 
 Swaps injected `SOUL.md` content with `SOUL_EVIL.md` during a purge window or by random chance.
