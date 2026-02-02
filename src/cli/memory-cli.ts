@@ -16,6 +16,8 @@ import { colorize, isRich, theme } from "../terminal/theme.js";
 import { shortenHomeInString, shortenHomePath } from "../utils.js";
 import { formatErrorMessage, withManager } from "./cli-utils.js";
 import { withProgress, withProgressTotals } from "./progress.js";
+import { resolveAgentWorkspaceDir } from "../agents/agent-scope.js";
+import { getEntityManager } from "../memory/entity-manager.js";
 
 type MemoryCommandOptions = {
   agent?: string;
@@ -678,4 +680,184 @@ export function registerMemoryCli(program: Command) {
         });
       },
     );
+
+  // Entity management commands
+  const entity = memory
+    .command("entity")
+    .description("Manage entity-centric memory (people, places, projects, etc.)")
+    .addHelpText(
+      "after",
+      () =>
+        `\n${theme.muted("Docs:")} ${formatDocsLink("/concepts/memory", "docs.openclaw.ai/concepts/memory")}\n`,
+    );
+
+  entity
+    .command("create")
+    .description("Create a new entity")
+    .argument("<name>", "Entity name")
+    .option("--agent <id>", "Agent id (default: default agent)")
+    .option("--display-name <name>", "Display name (defaults to name)")
+    .option("--type <type>", "Entity type (default: unknown)")
+    .option("--description <text>", "Entity description")
+    .option("--json", "Print JSON")
+    .action(
+      async (
+        name: string,
+        opts: MemoryCommandOptions & {
+          displayName?: string;
+          type?: string;
+          description?: string;
+        },
+      ) => {
+        const cfg = loadConfig();
+        const agentId = resolveAgent(cfg, opts.agent);
+        const workspaceDir = resolveAgentWorkspaceDir(cfg, agentId);
+        const manager = getEntityManager(workspaceDir);
+
+        try {
+          const entity = await manager.createEntity(name, {
+            displayName: opts.displayName,
+            type: opts.type,
+            description: opts.description,
+          });
+
+          if (opts.json) {
+            defaultRuntime.log(JSON.stringify(entity, null, 2));
+          } else {
+            const rich = isRich();
+            defaultRuntime.log(
+              `${colorize(rich, theme.success, "Created entity:")} ${colorize(rich, theme.accent, entity.displayName)}`,
+            );
+            defaultRuntime.log(`  Type: ${entity.type}`);
+            defaultRuntime.log(`  Path: ${shortenHomePath(path.join(workspaceDir, entity.filePath))}`);
+          }
+        } catch (err) {
+          const message = formatErrorMessage(err);
+          defaultRuntime.error(`Failed to create entity: ${message}`);
+          process.exitCode = 1;
+        }
+      },
+    );
+
+  entity
+    .command("list")
+    .description("List all entities")
+    .option("--agent <id>", "Agent id (default: default agent)")
+    .option("--json", "Print JSON")
+    .action(async (opts: MemoryCommandOptions) => {
+      const cfg = loadConfig();
+      const agentId = resolveAgent(cfg, opts.agent);
+      const workspaceDir = resolveAgentWorkspaceDir(cfg, agentId);
+      const manager = getEntityManager(workspaceDir);
+
+      try {
+        const entities = await manager.listEntities();
+
+        if (opts.json) {
+          defaultRuntime.log(JSON.stringify(entities, null, 2));
+        } else {
+          if (entities.length === 0) {
+            defaultRuntime.log("No entities found.");
+            return;
+          }
+
+          const rich = isRich();
+          const lines: string[] = [];
+          lines.push(`${heading("Entities")} ${muted(`(${entities.length})`)}`);
+          lines.push("");
+
+          for (const entity of entities) {
+            const updated = new Date(entity.lastUpdated).toLocaleDateString();
+            lines.push(
+              `${colorize(rich, theme.accent, entity.displayName)} ${muted(`(${entity.type})`)}`,
+            );
+            lines.push(`  ${muted(entity.summary)}`);
+            lines.push(
+              `  ${muted(`${entity.keyFacts.length} facts · ${entity.relationshipCount} relationships · updated ${updated}`)}`,
+            );
+            lines.push("");
+          }
+
+          defaultRuntime.log(lines.join("\n").trim());
+        }
+      } catch (err) {
+        const message = formatErrorMessage(err);
+        defaultRuntime.error(`Failed to list entities: ${message}`);
+        process.exitCode = 1;
+      }
+    });
+
+  entity
+    .command("show")
+    .description("Show entity details")
+    .argument("<name>", "Entity name")
+    .option("--agent <id>", "Agent id (default: default agent)")
+    .option("--json", "Print JSON")
+    .action(async (name: string, opts: MemoryCommandOptions) => {
+      const cfg = loadConfig();
+      const agentId = resolveAgent(cfg, opts.agent);
+      const workspaceDir = resolveAgentWorkspaceDir(cfg, agentId);
+      const manager = getEntityManager(workspaceDir);
+
+      try {
+        const entity = await manager.getEntity(name);
+
+        if (!entity) {
+          defaultRuntime.error(`Entity "${name}" not found.`);
+          process.exitCode = 1;
+          return;
+        }
+
+        if (opts.json) {
+          defaultRuntime.log(JSON.stringify(entity, null, 2));
+        } else {
+          const rich = isRich();
+          const lines: string[] = [];
+          lines.push(`${heading(entity.displayName)} ${muted(`(${entity.type})`)}`);
+          if (entity.description) {
+            lines.push("");
+            lines.push(entity.description);
+          }
+          lines.push("");
+          lines.push(`${label("Updated")} ${new Date(entity.lastUpdated).toLocaleString()}`);
+          lines.push(`${label("Path")} ${info(shortenHomePath(path.join(workspaceDir, entity.filePath)))}`);
+
+          if (entity.relationships.length > 0) {
+            lines.push("");
+            lines.push(heading("Relationships"));
+            for (const rel of entity.relationships) {
+              lines.push(`  ${accent(rel.relation)} → ${rel.entity}`);
+            }
+          }
+
+          if (entity.facts.length > 0) {
+            lines.push("");
+            lines.push(heading(`Facts (${entity.facts.length})`));
+            const factsByType = new Map<string, typeof entity.facts>();
+            for (const fact of entity.facts) {
+              const existing = factsByType.get(fact.type) || [];
+              existing.push(fact);
+              factsByType.set(fact.type, existing);
+            }
+
+            for (const [type, facts] of factsByType.entries()) {
+              lines.push(`  ${accent(type)} (${facts.length})`);
+              for (const fact of facts.slice(0, 3)) {
+                const conf = fact.confidence !== undefined ? ` [c=${fact.confidence.toFixed(2)}]` : "";
+                lines.push(`    - ${fact.content.slice(0, 100)}${conf}`);
+              }
+              if (facts.length > 3) {
+                lines.push(`    ... and ${facts.length - 3} more`);
+              }
+            }
+          }
+
+          defaultRuntime.log(lines.join("\n"));
+        }
+      } catch (err) {
+        const message = formatErrorMessage(err);
+        defaultRuntime.error(`Failed to show entity: ${message}`);
+        process.exitCode = 1;
+      }
+    });
 }
