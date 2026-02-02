@@ -25,6 +25,11 @@ import {
   parseEntityPageMarkdown,
 } from "./entity-templates.js";
 import { ensureDir } from "./internal.js";
+import {
+  entityQueryOptionsToTemporalQuery,
+  filterEntityFactsByTemporalQuery,
+} from "./temporal-queries.js";
+import { getOpinionsManager, type Conflict } from "./opinions-manager.js";
 
 const log = createSubsystemLogger("memory:entity");
 
@@ -306,17 +311,11 @@ export class EntityManager {
         }
       }
 
-      // Filter by date range
-      if (options.since || options.until) {
-        const sinceTs = options.since?.getTime() || 0;
-        const untilTs = options.until?.getTime() || Date.now();
-
-        const hasFactsInRange = entity.facts.some((f) => {
-          const factTime = f.dateRange?.start || f.timestamp;
-          return factTime >= sinceTs && factTime <= untilTs;
-        });
-
-        if (!hasFactsInRange && entity.lastUpdated < sinceTs) {
+      // Filter by date range using temporal queries
+      const temporalQuery = entityQueryOptionsToTemporalQuery(options);
+      if (temporalQuery) {
+        const matchingFacts = filterEntityFactsByTemporalQuery(entity, temporalQuery);
+        if (matchingFacts.length === 0 && entity.lastUpdated < (temporalQuery.since || 0)) {
           continue;
         }
       }
@@ -336,6 +335,19 @@ export class EntityManager {
     }
 
     return results;
+  }
+
+  /**
+   * Detect conflicts for an entity
+   */
+  async detectConflicts(entityName: string): Promise<Conflict[]> {
+    const entity = await this.getEntity(entityName);
+    if (!entity) {
+      return [];
+    }
+
+    const opinionsManager = getOpinionsManager(this.workspaceDir);
+    return await opinionsManager.detectConflictsForEntities([entityName]);
   }
 
   /**
@@ -416,6 +428,12 @@ export class EntityManager {
     await this.updateEntity(entityName, {
       addFacts: [fullFact],
     });
+
+    // If this is an opinion, also add it to opinions manager
+    if (fact.type === "opinion") {
+      const opinionsManager = getOpinionsManager(this.workspaceDir);
+      await opinionsManager.addOpinion(fullFact, fact.confidence);
+    }
   }
 }
 

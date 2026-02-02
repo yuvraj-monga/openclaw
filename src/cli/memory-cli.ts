@@ -18,6 +18,8 @@ import { formatErrorMessage, withManager } from "./cli-utils.js";
 import { withProgress, withProgressTotals } from "./progress.js";
 import { resolveAgentWorkspaceDir } from "../agents/agent-scope.js";
 import { getEntityManager } from "../memory/entity-manager.js";
+import { getOpinionsManager } from "../memory/opinions-manager.js";
+import type { Conflict } from "../memory/opinions-manager.js";
 
 type MemoryCommandOptions = {
   agent?: string;
