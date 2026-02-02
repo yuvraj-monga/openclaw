@@ -336,6 +336,7 @@ export async function runMemoryStatus(opts: MemoryCommandOptions) {
   const info = (text: string) => colorize(rich, theme.info, text);
   const success = (text: string) => colorize(rich, theme.success, text);
   const warn = (text: string) => colorize(rich, theme.warn, text);
+  const error = (text: string) => colorize(rich, theme.error, text);
   const accent = (text: string) => colorize(rich, theme.accent, text);
   const label = (text: string) => muted(`${text}:`);
 
@@ -900,7 +901,7 @@ export function registerMemoryCli(program: Command) {
 
           for (const conflict of conflicts) {
             const severityColor =
-              conflict.severity > 0.7 ? theme.warn : conflict.severity > 0.4 ? theme.muted : theme.muted;
+              conflict.severity > 0.7 ? theme.error : conflict.severity > 0.4 ? theme.warn : theme.muted;
             lines.push(
               `${colorize(rich, severityColor, conflict.type.toUpperCase())} ${muted(`(severity: ${conflict.severity.toFixed(2)})`)}`,
             );
