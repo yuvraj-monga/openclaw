@@ -862,4 +862,62 @@ export function registerMemoryCli(program: Command) {
         process.exitCode = 1;
       }
     });
+
+  entity
+    .command("conflicts")
+    .description("Detect conflicts in opinions for an entity")
+    .argument("[name]", "Entity name (optional, shows all if not specified)")
+    .option("--agent <id>", "Agent id (default: default agent)")
+    .option("--json", "Print JSON")
+    .action(async (name: string | undefined, opts: MemoryCommandOptions) => {
+      const cfg = loadConfig();
+      const agentId = resolveAgent(cfg, opts.agent);
+      const workspaceDir = resolveAgentWorkspaceDir(cfg, agentId);
+      const entityManager = getEntityManager(workspaceDir);
+      const opinionsManager = getOpinionsManager(workspaceDir);
+
+      try {
+        let conflicts: Conflict[];
+
+        if (name) {
+          conflicts = await entityManager.detectConflicts(name);
+        } else {
+          conflicts = await opinionsManager.detectConflictsForEntities();
+        }
+
+        if (opts.json) {
+          defaultRuntime.log(JSON.stringify(conflicts, null, 2));
+        } else {
+          if (conflicts.length === 0) {
+            defaultRuntime.log("No conflicts detected.");
+            return;
+          }
+
+          const rich = isRich();
+          const lines: string[] = [];
+          lines.push(`${heading("Conflicts")} ${muted(`(${conflicts.length})`)}`);
+          lines.push("");
+
+          for (const conflict of conflicts) {
+            const severityColor =
+              conflict.severity > 0.7 ? theme.warn : conflict.severity > 0.4 ? theme.muted : theme.muted;
+            lines.push(
+              `${colorize(rich, severityColor, conflict.type.toUpperCase())} ${muted(`(severity: ${conflict.severity.toFixed(2)})`)}`,
+            );
+            lines.push(`  ${conflict.description}`);
+            lines.push(`  Facts: ${conflict.factId1} ↔ ${conflict.factId2}`);
+            if (conflict.entities.length > 0) {
+              lines.push(`  Entities: ${conflict.entities.join(", ")}`);
+            }
+            lines.push("");
+          }
+
+          defaultRuntime.log(lines.join("\n").trim());
+        }
+      } catch (err) {
+        const message = formatErrorMessage(err);
+        defaultRuntime.error(`Failed to detect conflicts: ${message}`);
+        process.exitCode = 1;
+      }
+    });
 }
